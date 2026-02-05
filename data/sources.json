@@ -1,0 +1,42 @@
+[
+  {
+    "id": "reuters",
+    "name": "Reuters",
+    "country": "international",
+    "rss": "https://feeds.reuters.com/reuters/worldNews",
+    "base_authority": 0.95,
+    "topics": ["politics", "ai", "auto", "games"]
+  },
+  {
+    "id": "bbc",
+    "name": "BBC News",
+    "country": "international",
+    "rss": "https://feeds.bbci.co.uk/news/world/rss.xml",
+    "base_authority": 0.9,
+    "topics": ["politics", "ai", "auto", "games"]
+  },
+  {
+    "id": "nytimes",
+    "name": "The New York Times",
+    "country": "international",
+    "rss": "https://rss.nytimes.com/services/xml/rss/nyt/World.xml",
+    "base_authority": 0.88,
+    "topics": ["politics", "ai", "auto", "games"]
+  },
+  {
+    "id": "xinhuanet",
+    "name": "新华社",
+    "country": "china",
+    "rss": "http://www.xinhuanet.com/world/news_world.xml",
+    "base_authority": 0.92,
+    "topics": ["politics", "ai", "auto", "games"]
+  },
+  {
+    "id": "chinadaily",
+    "name": "China Daily",
+    "country": "china",
+    "rss": "https://www.chinadaily.com.cn/rss/world_rss.xml",
+    "base_authority": 0.86,
+    "topics": ["politics", "ai", "auto", "games"]
+  }
+]
