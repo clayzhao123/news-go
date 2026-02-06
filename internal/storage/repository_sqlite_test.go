@@ -19,7 +19,7 @@ func TestMemoryUpsertDeduplicate(t *testing.T) {
 	if err := repo.UpsertArticles(ctx, input); err != nil {
 		t.Fatalf("upsert: %v", err)
 	}
-	items, err := repo.ListArticles(ctx, 100, 0)
+	items, err := repo.ListArticles(ctx, ListOptions{Limit: 100, Offset: 0})
 	if err != nil {
 		t.Fatalf("list: %v", err)
 	}
@@ -34,5 +34,17 @@ func TestMemoryUpsertDeduplicate(t *testing.T) {
 	}
 	if count != 1 {
 		t.Fatalf("expected exactly one deduped row, got %d", count)
+	}
+}
+
+func TestMemoryFilterByKeyword(t *testing.T) {
+	repo := NewMemoryArticleRepository()
+	ctx := context.Background()
+	items, err := repo.ListArticles(ctx, ListOptions{Limit: 100, Offset: 0, Keyword: "initialized"})
+	if err != nil {
+		t.Fatalf("list: %v", err)
+	}
+	if len(items) != 1 {
+		t.Fatalf("expected 1 filtered article, got %d", len(items))
 	}
 }

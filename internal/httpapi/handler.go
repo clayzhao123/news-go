@@ -5,6 +5,7 @@ import (
 	"net/http"
 	"strconv"
 	"strings"
+	"time"
 
 	"news-go/internal/storage"
 )
@@ -17,6 +18,7 @@ func NewHandler(repo storage.ArticleRepository) *Handler { return &Handler{repo:
 
 func (h *Handler) Register(mux *http.ServeMux) {
 	mux.HandleFunc("/healthz", h.healthz)
+	mux.HandleFunc("/readyz", h.readyz)
 	mux.HandleFunc("/v1/articles", h.listArticles)
 	mux.HandleFunc("/v1/articles/", h.getArticleByID)
 }
@@ -25,20 +27,39 @@ func (h *Handler) healthz(w http.ResponseWriter, _ *http.Request) {
 	writeJSON(w, http.StatusOK, map[string]string{"status": "ok"})
 }
 
+func (h *Handler) readyz(w http.ResponseWriter, r *http.Request) {
+	if err := h.repo.Ready(r.Context()); err != nil {
+		writeJSON(w, http.StatusServiceUnavailable, map[string]string{"status": "not_ready", "error": err.Error()})
+		return
+	}
+	writeJSON(w, http.StatusOK, map[string]string{"status": "ready"})
+}
+
 func (h *Handler) listArticles(w http.ResponseWriter, r *http.Request) {
-	limit := parseIntOrDefault(r.URL.Query().Get("limit"), 20)
+	limit := clamp(parseIntOrDefault(r.URL.Query().Get("limit"), 20), 1, 100)
 	offset := parseIntOrDefault(r.URL.Query().Get("offset"), 0)
-	if limit <= 0 {
-		limit = 20
-	}
-	if limit > 100 {
-		limit = 100
-	}
 	if offset < 0 {
 		offset = 0
 	}
 
-	articles, err := h.repo.ListArticles(r.Context(), limit, offset)
+	opts := storage.ListOptions{
+		Limit:   limit,
+		Offset:  offset,
+		Keyword: strings.TrimSpace(r.URL.Query().Get("q")),
+		Source:  strings.TrimSpace(r.URL.Query().Get("source")),
+	}
+	if from := strings.TrimSpace(r.URL.Query().Get("from")); from != "" {
+		if t, err := time.Parse(time.RFC3339, from); err == nil {
+			opts.PublishedFrom = t
+		}
+	}
+	if to := strings.TrimSpace(r.URL.Query().Get("to")); to != "" {
+		if t, err := time.Parse(time.RFC3339, to); err == nil {
+			opts.PublishedTo = t
+		}
+	}
+
+	articles, err := h.repo.ListArticles(r.Context(), opts)
 	if err != nil {
 		writeJSON(w, http.StatusInternalServerError, map[string]string{"error": "failed to list articles"})
 		return
@@ -74,6 +95,16 @@ func parseIntOrDefault(v string, fallback int) int {
 		return fallback
 	}
 	return n
+}
+
+func clamp(v, min, max int) int {
+	if v < min {
+		return min
+	}
+	if v > max {
+		return max
+	}
+	return v
 }
 
 func writeJSON(w http.ResponseWriter, status int, data any) {
