@@ -9,11 +9,10 @@ import (
 	"time"
 
 	"news-go/internal/news"
+	"news-go/internal/storage"
 )
 
-type stubRepo struct {
-	items []news.Article
-}
+type stubRepo struct{ items []news.Article }
 
 func (s stubRepo) ListArticles(_ context.Context, limit, offset int) ([]news.Article, error) {
 	if offset >= len(s.items) {
@@ -26,15 +25,23 @@ func (s stubRepo) ListArticles(_ context.Context, limit, offset int) ([]news.Art
 	return s.items[offset:end], nil
 }
 
+func (s stubRepo) GetArticleByID(_ context.Context, id int64) (news.Article, error) {
+	for _, it := range s.items {
+		if it.ID == id {
+			return it, nil
+		}
+	}
+	return news.Article{}, storage.ErrNotFound
+}
+
+func (s stubRepo) UpsertArticles(_ context.Context, _ []news.Article) error { return nil }
+
 func TestHealthz(t *testing.T) {
 	h := NewHandler(stubRepo{})
 	mux := http.NewServeMux()
 	h.Register(mux)
-
-	req := httptest.NewRequest(http.MethodGet, "/healthz", nil)
 	rr := httptest.NewRecorder()
-	mux.ServeHTTP(rr, req)
-
+	mux.ServeHTTP(rr, httptest.NewRequest(http.MethodGet, "/healthz", nil))
 	if rr.Code != http.StatusOK {
 		t.Fatalf("expected 200, got %d", rr.Code)
 	}
@@ -45,22 +52,38 @@ func TestListArticles(t *testing.T) {
 	h := NewHandler(stubRepo{items: []news.Article{{ID: 1, Title: "a", PublishedAt: now}}})
 	mux := http.NewServeMux()
 	h.Register(mux)
-
-	req := httptest.NewRequest(http.MethodGet, "/v1/articles?limit=10&offset=0", nil)
 	rr := httptest.NewRecorder()
-	mux.ServeHTTP(rr, req)
-
+	mux.ServeHTTP(rr, httptest.NewRequest(http.MethodGet, "/v1/articles?limit=10&offset=0", nil))
 	if rr.Code != http.StatusOK {
 		t.Fatalf("expected 200, got %d", rr.Code)
 	}
-
 	var body struct {
 		Items []news.Article `json:"items"`
 	}
-	if err := json.Unmarshal(rr.Body.Bytes(), &body); err != nil {
-		t.Fatalf("invalid json: %v", err)
+	if err := json.Unmarshal(rr.Body.Bytes(), &body); err != nil || len(body.Items) != 1 {
+		t.Fatalf("unexpected response: %v len=%d", err, len(body.Items))
 	}
-	if len(body.Items) != 1 {
-		t.Fatalf("expected 1 article, got %d", len(body.Items))
-	}
+}
+
+func TestGetArticleByID(t *testing.T) {
+	now := time.Now().UTC()
+	h := NewHandler(stubRepo{items: []news.Article{{ID: 7, Title: "detail", PublishedAt: now}}})
+	mux := http.NewServeMux()
+	h.Register(mux)
+
+	t.Run("ok", func(t *testing.T) {
+		rr := httptest.NewRecorder()
+		mux.ServeHTTP(rr, httptest.NewRequest(http.MethodGet, "/v1/articles/7", nil))
+		if rr.Code != http.StatusOK {
+			t.Fatalf("expected 200, got %d", rr.Code)
+		}
+	})
+
+	t.Run("not found", func(t *testing.T) {
+		rr := httptest.NewRecorder()
+		mux.ServeHTTP(rr, httptest.NewRequest(http.MethodGet, "/v1/articles/9", nil))
+		if rr.Code != http.StatusNotFound {
+			t.Fatalf("expected 404, got %d", rr.Code)
+		}
+	})
 }
