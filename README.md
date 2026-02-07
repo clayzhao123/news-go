@@ -9,6 +9,7 @@
   - `GET /healthz`
   - `GET /readyz`
   - `GET /v1/articles?limit=&offset=&q=&source=&from=&to=`（`from/to` 需为 RFC3339，且 `from <= to`，否则返回 400）
+  - `GET /v1/articles?limit=&offset=&q=&source=&from=&to=`（`from/to` 需为 RFC3339，否则返回 400）
   - `GET /v1/articles/{id}`
 - RSS 抓取：启动抓取 + 定时同步（可配置间隔/重试）
 - 存储：优先 SQLite，不可用时回退内存仓储
