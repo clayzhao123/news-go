@@ -100,6 +100,40 @@ func TestListArticles(t *testing.T) {
 	}
 }
 
+func TestListArticlesInvalidTimeFilter(t *testing.T) {
+	h := NewHandler(stubRepo{})
+	mux := http.NewServeMux()
+	h.Register(mux)
+
+	t.Run("invalid from", func(t *testing.T) {
+		rr := httptest.NewRecorder()
+		mux.ServeHTTP(rr, httptest.NewRequest(http.MethodGet, "/v1/articles?from=bad-time", nil))
+		if rr.Code != http.StatusBadRequest {
+			t.Fatalf("expected 400, got %d", rr.Code)
+		}
+	})
+
+	t.Run("invalid to", func(t *testing.T) {
+		rr := httptest.NewRecorder()
+		mux.ServeHTTP(rr, httptest.NewRequest(http.MethodGet, "/v1/articles?to=bad-time", nil))
+		if rr.Code != http.StatusBadRequest {
+			t.Fatalf("expected 400, got %d", rr.Code)
+		}
+	})
+}
+
+func TestListArticlesInvalidTimeRange(t *testing.T) {
+	h := NewHandler(stubRepo{})
+	mux := http.NewServeMux()
+	h.Register(mux)
+
+	rr := httptest.NewRecorder()
+	mux.ServeHTTP(rr, httptest.NewRequest(http.MethodGet, "/v1/articles?from=2025-01-03T00:00:00Z&to=2025-01-02T00:00:00Z", nil))
+	if rr.Code != http.StatusBadRequest {
+		t.Fatalf("expected 400, got %d", rr.Code)
+	}
+}
+
 func TestGetArticleByID(t *testing.T) {
 	now := time.Now().UTC()
 	h := NewHandler(stubRepo{items: []news.Article{{ID: 7, Title: "detail", PublishedAt: now}}})
