@@ -64,6 +64,10 @@ func (h *Handler) listArticles(w http.ResponseWriter, r *http.Request) {
 		}
 		opts.PublishedTo = t
 	}
+	if !opts.PublishedFrom.IsZero() && !opts.PublishedTo.IsZero() && opts.PublishedFrom.After(opts.PublishedTo) {
+		writeJSON(w, http.StatusBadRequest, map[string]string{"error": "invalid time range: from must be before or equal to to"})
+		return
+	}
 
 	articles, err := h.repo.ListArticles(r.Context(), opts)
 	if err != nil {

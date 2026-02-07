@@ -122,6 +122,18 @@ func TestListArticlesInvalidTimeFilter(t *testing.T) {
 	})
 }
 
+func TestListArticlesInvalidTimeRange(t *testing.T) {
+	h := NewHandler(stubRepo{})
+	mux := http.NewServeMux()
+	h.Register(mux)
+
+	rr := httptest.NewRecorder()
+	mux.ServeHTTP(rr, httptest.NewRequest(http.MethodGet, "/v1/articles?from=2025-01-03T00:00:00Z&to=2025-01-02T00:00:00Z", nil))
+	if rr.Code != http.StatusBadRequest {
+		t.Fatalf("expected 400, got %d", rr.Code)
+	}
+}
+
 func TestGetArticleByID(t *testing.T) {
 	now := time.Now().UTC()
 	h := NewHandler(stubRepo{items: []news.Article{{ID: 7, Title: "detail", PublishedAt: now}}})
