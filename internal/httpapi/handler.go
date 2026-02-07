@@ -49,14 +49,20 @@ func (h *Handler) listArticles(w http.ResponseWriter, r *http.Request) {
 		Source:  strings.TrimSpace(r.URL.Query().Get("source")),
 	}
 	if from := strings.TrimSpace(r.URL.Query().Get("from")); from != "" {
-		if t, err := time.Parse(time.RFC3339, from); err == nil {
-			opts.PublishedFrom = t
+		t, err := parseRFC3339Param(from)
+		if err != nil {
+			writeJSON(w, http.StatusBadRequest, map[string]string{"error": "invalid from, expected RFC3339"})
+			return
 		}
+		opts.PublishedFrom = t
 	}
 	if to := strings.TrimSpace(r.URL.Query().Get("to")); to != "" {
-		if t, err := time.Parse(time.RFC3339, to); err == nil {
-			opts.PublishedTo = t
+		t, err := parseRFC3339Param(to)
+		if err != nil {
+			writeJSON(w, http.StatusBadRequest, map[string]string{"error": "invalid to, expected RFC3339"})
+			return
 		}
+		opts.PublishedTo = t
 	}
 
 	articles, err := h.repo.ListArticles(r.Context(), opts)
@@ -105,6 +111,10 @@ func clamp(v, min, max int) int {
 		return max
 	}
 	return v
+}
+
+func parseRFC3339Param(v string) (time.Time, error) {
+	return time.Parse(time.RFC3339, v)
 }
 
 func writeJSON(w http.ResponseWriter, status int, data any) {
