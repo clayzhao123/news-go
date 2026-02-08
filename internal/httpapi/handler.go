@@ -96,6 +96,21 @@ function renderScoreboard(data, scoreboard) {
       + '</tr>';
   }).join('');
 
+  const metrics = data.metrics || {};
+  const slots = data.slots || {};
+  const rows = Object.keys(data.scores)
+    .sort((a, b) => (data.scores[b] || 0) - (data.scores[a] || 0))
+    .map((sid) => {
+      const m = metrics[sid] || {};
+      return '<tr>'
+        + '<td>' + sid + '</td>'
+        + '<td>' + (data.scores[sid] ?? 0) + '</td>'
+        + '<td>' + (slots[sid] ?? 0) + '</td>'
+        + '<td>' + (m.weekly_volume ?? 0) + '</td>'
+        + '<td>' + (m.research_ratio ?? 0) + '</td>'
+        + '<td>' + (m.topic_coverage ?? 0) + '</td>'
+        + '</tr>';
+    }).join('');
   scoreboard.innerHTML = '<table>'
     + '<thead><tr><th>来源</th><th>评分</th><th>今日配额</th><th>周产量</th><th>研究占比</th><th>覆盖度</th></tr></thead>'
     + '<tbody>' + rows + '</tbody></table>';
@@ -120,6 +135,43 @@ function loadArticles() {
     if (!items.length) {
       var notes = (data && data.notes) ? data.notes.join('；') : '';
       list.innerHTML = '<div class="card">暂无可展示新闻。' + (notes ? ('<br/>' + notes) : '（可能是 RSS 源暂时不可访问）') + '</div>';
+    <div id="list"></div>
+  </div>
+<script>
+async function loadArticles() {
+  const q = document.getElementById('q').value.trim();
+  const digestURL = '/v1/digest';
+  const url = '/v1/articles?limit=20&offset=0' + (q ? ('&q=' + encodeURIComponent(q)) : '');
+  const status = document.getElementById('status');
+  const list = document.getElementById('list');
+  const scoreboard = document.getElementById('scoreboard');
+  status.textContent = '加载中...';
+  list.innerHTML = '';
+  scoreboard.innerHTML = '';
+  status.textContent = '加载中...';
+  list.innerHTML = '';
+  try {
+    let data = null;
+    let items = [];
+    if (!q) {
+      const digestRes = await fetch(digestURL);
+      if (digestRes.ok) {
+        data = await digestRes.json();
+        items = data.items || [];
+        status.textContent = '策略摘要，共 ' + items.length + ' 条';
+        renderScoreboard(data, scoreboard);
+      }
+    }
+    if (!items.length) {
+      const res = await fetch(url);
+      data = await res.json();
+      items = data.items || [];
+      status.textContent = '普通列表，共 ' + items.length + ' 条';
+    }
+    if (!items.length) {
+      const notes = (data && data.notes) ? data.notes.join('；') : '';
+      list.innerHTML = '<div class="card">暂无可展示新闻。' + (notes ? ('<br/>' + notes) : '（可能是 RSS 源暂时不可访问）') + '</div>';
+      list.innerHTML = '<div class="card">暂无数据（可能是 RSS 源暂时不可访问）</div>';
       return;
     }
     list.innerHTML = items.map(function (x) {
@@ -173,6 +225,11 @@ function loadArticles() {
   loadArticlesFallback();
 }
 
+  } catch (e) {
+    status.textContent = '加载失败';
+    list.innerHTML = '<div class="card">请求失败，请检查服务日志。</div>';
+  }
+}
 loadArticles();
 </script>
 </body>

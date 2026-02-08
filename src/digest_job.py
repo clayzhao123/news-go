@@ -23,6 +23,7 @@ def main() -> None:
         "research_target": meta.research_target,
         "research_selected": meta.research_selected,
         "notes": list(meta.notes),
+        "notes": meta.notes,
         "scores": scores,
         "slots": slots,
         "metrics": metrics,
@@ -49,6 +50,9 @@ def main() -> None:
     DIGEST_PATH.write_text(json.dumps(payload, ensure_ascii=False, indent=2), encoding="utf-8")
     print(f"daily digest written: {DIGEST_PATH}")
     print(f"items: {len(payload['items'])}, fallback_from_previous: {payload['fallback_from_previous']}")
+    DIGEST_PATH.parent.mkdir(parents=True, exist_ok=True)
+    DIGEST_PATH.write_text(json.dumps(payload, ensure_ascii=False, indent=2), encoding="utf-8")
+    print(f"daily digest written: {DIGEST_PATH}")
 
 
 if __name__ == "__main__":
