@@ -92,6 +92,8 @@ async function loadArticles() {
       status.textContent = '普通列表，共 ' + items.length + ' 条';
     }
     if (!items.length) {
+      const notes = (data && data.notes) ? data.notes.join('；') : '';
+      list.innerHTML = '<div class="card">暂无可展示新闻。' + (notes ? ('<br/>' + notes) : '（可能是 RSS 源暂时不可访问）') + '</div>';
       list.innerHTML = '<div class="card">暂无数据（可能是 RSS 源暂时不可访问）</div>';
       return;
     }

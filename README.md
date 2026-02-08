@@ -28,6 +28,10 @@ powershell -ExecutionPolicy Bypass -File .\scripts\deploy_simple.ps1
 2. 生成今日摘要 `data/daily_digest.json`；
 3. 启动 Go 服务（`http://localhost:8080/`）。
 
+若当日抓取失败，会自动保留上一次成功摘要，避免页面空白。
+
+如果第一次部署就为空，请先确认网络是否能访问 `data/sources.json` 里的 RSS。
+
 如果你已经配好 Python 环境，也可以直接：
 
 ```bash
