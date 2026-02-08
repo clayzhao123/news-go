@@ -101,6 +101,11 @@ RSS_USER_AGENT=news-go/1.0
 ```bash
 cd news-go
 cp .env.example .env
+```
+
+### 4) 启动服务
+
+```bash
 make run
 ```
 
@@ -128,6 +133,50 @@ curl "http://localhost:8080/v1/articles?limit=10&offset=0"
 curl "http://localhost:8080/v1/articles?q=ai&source=Hacker%20News"
 ```
 
+参数说明：
+
+- `limit`：每页数量
+- `offset`：从第几条开始
+- `q`：关键词
+- `source`：来源名
+- `from/to`：时间范围（必须是 RFC3339，如 `2026-01-01T00:00:00Z`）
+
+---
+
+## F. 开发常用命令
+
+> Windows 若未安装 make，请用右侧 Go 原生命令。
+
+```bash
+make test   # 或 go test ./...
+make vet    # 或 go vet ./...
+make fmt    # 或 gofmt -w ./cmd ./internal
+```
+
+---
+
+## G. 可选：运行 Python Streamlit 摘要 Demo
+
+这部分是演示页面，和 Go API 不是同一运行时。
+
+- `limit`：每页数量
+- `offset`：从第几条开始
+- `q`：关键词
+- `source`：来源名
+- `from/to`：时间范围（必须是 RFC3339，如 `2026-01-01T00:00:00Z`）
+
+---
+
+## F. 开发常用命令
+
+> Windows 若未安装 make，请用右侧 Go 原生命令。
+
+```bash
+make test   # 或 go test ./...
+make vet    # 或 go vet ./...
+make fmt    # 或 gofmt -w ./cmd ./internal
+```
+
 ---
 
 ## 6. 开发命令
@@ -144,7 +193,7 @@ make fmt    # 或 gofmt -w ./cmd ./internal
 
 ```bash
 python -m venv .venv
-source .venv/bin/activate  # Windows: .venv\Scripts\activate
+source .venv/bin/activate  # Windows 用: .venv\Scripts\activate
 pip install -r requirements.txt
 streamlit run app.py
 ```
