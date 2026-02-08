@@ -114,10 +114,7 @@ flowchart TD
 ### A) 运行策略版 UI（推荐看结果）
 
 ```bash
-python -m venv .venv
-source .venv/bin/activate  # Windows: .venv\Scripts\activate
-pip install -r requirements.txt
-streamlit run app.py
+python -m src.digest_job
 ```
 
 打开：`http://localhost:8501`
