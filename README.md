@@ -1,136 +1,66 @@
 # news-go
 
-`news-go` 是一个新闻聚合项目：
+本仓库目前有两条线：
 
-- **Go API（主线）**：抓取 RSS、存储、查询接口。
-- **Python Streamlit（可选）**：摘要演示页面。
+- **Go API（工程主线）**：抓取 RSS、入库、提供接口与简易浏览 UI（`http://localhost:8080/`）。
+- **Python Streamlit（策略线）**：实现“每周来源打分 + 每日10篇加权摘要”策略（`streamlit run app.py`）。
 
----
-
-## 1. 先看结论（避免你反复踩坑）
-
-1. 你在 Windows 报 `make` 找不到，是因为系统通常默认**没安装 make**，不是项目坏了。
-2. Windows 上直接跑：`go run ./cmd/api`（不需要 make）。
-3. 如果日志出现 `sqlite3 not installed, using in-memory repository`，服务仍然能跑，只是数据不落盘。
-4. `/healthz` 返回 `{"status":"ok"}` 就表示服务已跑通。
+如果你的目标是你提的那套“来源权威性评分 + 每日10篇加权推送”，请直接使用 **Python Streamlit** 这条线。
 
 ---
 
-## 2. 快速启动（Windows PowerShell，推荐）
+## 你的初始诉求是否满足（当前版本）
 
-### 步骤 1：进入目录
+✅ 已满足（在 `src/news_pipeline.py` + `app.py`）：
 
-```powershell
-cd news-go
-```
-
-### 步骤 2：复制配置
-
-```powershell
-Copy-Item .env.example .env
-```
-
-### 步骤 3：启动服务（不使用 make）
-
-```powershell
-go run ./cmd/api
-```
-
-看到类似输出表示成功：
-
-```text
-news-go listening on :8080
-```
-
-### 步骤 4：验证
-
-新开一个 PowerShell：
-
-```powershell
-curl http://localhost:8080/healthz
-```
-
-看到：
-
-```json
-{"status":"ok"}
-```
+1. **每周给来源打分（影响因子风格）**：
+   - 每 7 天更新一次分数并缓存到 `data/weights.json`。
+2. **根据权重分配每日摘要名额**：
+   - 每日总量 10 篇。
+   - 高权重来源可获得 2~3 篇；低权重可能 0 篇。
+3. **按领域过滤**：
+   - 仅收录 `汽车 / AI / 游戏 / 政治`。
+4. **研究类约束**：
+   - 优先保证至少 2 篇“AI/汽车前沿研究”新闻；若当天不足会在 UI 明确提示。
+5. **可信度基本审查**：
+   - 仅从你认可的白名单来源（`data/sources.json`）采集。
 
 ---
 
-## 3. 常见问题
+## 算法原理（为什么这么做）
 
-### Q1：`make run` 报错（make 未识别）
+我们用一个 **Impact-Factor-like** 的可解释打分：
 
-原因：你机器没装 make。  
-解决：直接执行以下等价命令：
+- `base_authority`：你对来源的先验权威评分（人工设定）。
+- `weekly_volume`：近 7 天该来源产出量（log 平滑）。
+- `research_ratio`：近 7 天研究类新闻占比。
+- `topic_coverage`：近 7 天覆盖 4 个目标领域的广度。
 
-```powershell
-go run ./cmd/api
-```
+### 评分公式
 
-### Q2：出现 `sqlite3 not installed, using in-memory repository`
+\[
+score = base\_authority \times \left(1 + 0.45\cdot\log(1+weekly\_volume) + 0.35\cdot research\_ratio + 0.20\cdot topic\_coverage\right)
+\]
 
-原因：没装 `sqlite3` 命令行工具。  
-影响：服务可用，但重启后数据会丢失（内存模式）。
+### 为什么用这套公式
 
-可选安装（Windows）：
+- `base_authority` 保证“权威媒体先验”被保留；
+- `log(volume)` 防止“纯刷量”碾压；
+- `research_ratio` 奖励研究型内容；
+- `topic_coverage` 奖励领域覆盖均衡；
+- 全部特征可解释，可在 UI 直接展示，便于人工审计。
 
-```powershell
-winget install SQLite.SQLite
-```
+### 流程图（图像化展示）
 
-安装后重开终端，再执行 `go run ./cmd/api`。
-
-### Q3：服务起来了，但文章为空
-
-常见原因：默认 RSS 源在部分网络环境会 403。
-
-可尝试修改 `.env`：
-
-```env
-RSS_MAX_RETRIES=0
-RSS_FEED_URL=<你能访问的 RSS 地址>
-RSS_USER_AGENT=news-go/1.0
-```
-
----
-
-## 4. 其他系统启动方式（macOS/Linux）
-
-```bash
-cd news-go
-cp .env.example .env
-```
-
-### 4) 启动服务
-
-```bash
-make run
-```
-
-如果你没有 make，也可以直接：
-
-```bash
-go run ./cmd/api
-```
-
----
-
-## 5. 接口示例
-
-```bash
-# 健康检查
-curl http://localhost:8080/healthz
-
-# 就绪检查
-curl http://localhost:8080/readyz
-
-# 文章列表
-curl "http://localhost:8080/v1/articles?limit=10&offset=0"
-
-# 关键词 + 来源过滤
-curl "http://localhost:8080/v1/articles?q=ai&source=Hacker%20News"
+```mermaid
+flowchart TD
+  A[白名单来源 data/sources.json] --> B[抓取RSS并过滤可信链接]
+  B --> C[分类: AI/汽车/游戏/政治]
+  C --> D[每周打分 score]
+  D --> E[按权重分配每日10篇名额]
+  E --> F[优先选AI/汽车研究类>=2篇]
+  F --> G[不足则提示并输出可得内容]
+  G --> H[Streamlit每日摘要展示]
 ```
 
 参数说明：
@@ -143,9 +73,20 @@ curl "http://localhost:8080/v1/articles?q=ai&source=Hacker%20News"
 
 ---
 
-## F. 开发常用命令
+## 每日10篇如何分配
 
-> Windows 若未安装 make，请用右侧 Go 原生命令。
+- 总名额固定 10。
+- 按 score 比例分配，单源上限 3 篇。
+- 低分源可分到 0 篇。
+- 然后从“当天新闻”中按来源与时间优先级选择。
+
+> 这意味着不是“每个来源都必须有新闻”，而是“高权重多拿、低权重可不拿”。
+
+---
+
+## 快速运行（你关心的）
+
+### A) 运行策略版 UI（推荐看结果）
 
 ```bash
 make test   # 或 go test ./...
@@ -153,49 +94,44 @@ make vet    # 或 go vet ./...
 make fmt    # 或 gofmt -w ./cmd ./internal
 ```
 
----
+打开：`http://localhost:8501`
 
-## G. 可选：运行 Python Streamlit 摘要 Demo
-
-这部分是演示页面，和 Go API 不是同一运行时。
-
-- `limit`：每页数量
-- `offset`：从第几条开始
-- `q`：关键词
-- `source`：来源名
-- `from/to`：时间范围（必须是 RFC3339，如 `2026-01-01T00:00:00Z`）
-
----
-
-## F. 开发常用命令
-
-> Windows 若未安装 make，请用右侧 Go 原生命令。
+### B) 生成策略摘要文件（供 Go UI / API 读取）
 
 ```bash
-make test   # 或 go test ./...
-make vet    # 或 go vet ./...
-make fmt    # 或 gofmt -w ./cmd ./internal
+python -m src.digest_job
 ```
+
+会生成：`data/daily_digest.json`（建议用系统定时任务每天跑一次）。
+
+### C) 运行 Go API（工程服务）
+
+```bash
+cp .env.example .env
+go run ./cmd/api   # Windows 同样可用
+```
+
+打开：`http://localhost:8080/`
+
+- 根页面会优先读取策略摘要接口 `GET /v1/digest`。
+- 若当天未生成摘要文件，会自动回退展示普通新闻列表。
 
 ---
 
-## 6. 开发命令
+## 关键文件
 
-```bash
-make test   # 或 go test ./...
-make vet    # 或 go vet ./...
-make fmt    # 或 gofmt -w ./cmd ./internal
-```
+- `src/news_pipeline.py`：每周评分、每日10篇分配、研究类约束。
+- `app.py`：可视化展示权重、名额、今日摘要。
+- `data/sources.json`：白名单来源与基础权威分。
+- `data/weights.json`：每周评分缓存。
+- `src/digest_job.py`：生成 `data/daily_digest.json` 的每日任务脚本。
 
 ---
 
-## 7. 可选：运行 Python Streamlit Demo
+## 局限与后续建议
 
-```bash
-python -m venv .venv
-source .venv/bin/activate  # Windows 用: .venv\Scripts\activate
-pip install -r requirements.txt
-streamlit run app.py
-```
+当前“真实性”采用白名单 + 基础规则过滤。若要更严格，建议后续增加：
 
-浏览器打开：`http://localhost:8501`。
+1. 多源交叉印证（同主题至少2家权威源）；
+2. 事实核查源（如官方通告）比对；
+3. LLM + 检索证据链评分（附证据链接）。
