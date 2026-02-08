@@ -63,6 +63,14 @@ flowchart TD
   G --> H[Streamlit每日摘要展示]
 ```
 
+参数说明：
+
+- `limit`：每页数量
+- `offset`：从第几条开始
+- `q`：关键词
+- `source`：来源名
+- `from/to`：时间范围（必须是 RFC3339，如 `2026-01-01T00:00:00Z`）
+
 ---
 
 ## 每日10篇如何分配
@@ -81,10 +89,9 @@ flowchart TD
 ### A) 运行策略版 UI（推荐看结果）
 
 ```bash
-python -m venv .venv
-source .venv/bin/activate  # Windows: .venv\Scripts\activate
-pip install -r requirements.txt
-streamlit run app.py
+make test   # 或 go test ./...
+make vet    # 或 go vet ./...
+make fmt    # 或 gofmt -w ./cmd ./internal
 ```
 
 打开：`http://localhost:8501`
