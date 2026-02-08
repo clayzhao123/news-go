@@ -2,6 +2,7 @@ package app
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"log"
 	"net/http"
@@ -28,6 +29,10 @@ func NewServer(cfg config.Config) *http.Server {
 func buildRepository(cfg config.Config) storage.ArticleRepository {
 	repo, err := storage.NewSQLiteArticleRepository(cfg.DBPath, "db/schema.sql")
 	if err != nil {
+		if errors.Is(err, storage.ErrSQLiteBinaryNotFound) {
+			log.Printf("sqlite3 not installed, using in-memory repository")
+			return storage.NewMemoryArticleRepository()
+		}
 		log.Printf("sqlite init failed, fallback to memory repo: %v", err)
 		return storage.NewMemoryArticleRepository()
 	}
