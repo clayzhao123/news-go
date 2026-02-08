@@ -74,6 +74,28 @@ function renderScoreboard(data, scoreboard) {
   if (!data || !data.scores) {
     return;
   }
+  var metrics = data.metrics || {};
+  var slots = data.slots || {};
+  var keys = Object.keys(data.scores).sort(function (a, b) {
+    return (data.scores[b] || 0) - (data.scores[a] || 0);
+  });
+  var rows = keys.map(function (sid) {
+    var m = metrics[sid] || {};
+    var score = (data.scores[sid] !== undefined && data.scores[sid] !== null) ? data.scores[sid] : 0;
+    var slot = (slots[sid] !== undefined && slots[sid] !== null) ? slots[sid] : 0;
+    var volume = (m.weekly_volume !== undefined && m.weekly_volume !== null) ? m.weekly_volume : 0;
+    var ratio = (m.research_ratio !== undefined && m.research_ratio !== null) ? m.research_ratio : 0;
+    var coverage = (m.topic_coverage !== undefined && m.topic_coverage !== null) ? m.topic_coverage : 0;
+    return '<tr>'
+      + '<td>' + sid + '</td>'
+      + '<td>' + score + '</td>'
+      + '<td>' + slot + '</td>'
+      + '<td>' + volume + '</td>'
+      + '<td>' + ratio + '</td>'
+      + '<td>' + coverage + '</td>'
+      + '</tr>';
+  }).join('');
+
   const metrics = data.metrics || {};
   const slots = data.slots || {};
   const rows = Object.keys(data.scores)
@@ -94,6 +116,25 @@ function renderScoreboard(data, scoreboard) {
     + '<tbody>' + rows + '</tbody></table>';
 }
 
+function loadArticles() {
+  var q = document.getElementById('q').value.trim();
+  var digestURL = '/v1/digest';
+  var url = '/v1/articles?limit=20&offset=0' + (q ? ('&q=' + encodeURIComponent(q)) : '');
+  var status = document.getElementById('status');
+  var list = document.getElementById('list');
+  var scoreboard = document.getElementById('scoreboard');
+
+  status.textContent = '加载中...';
+  list.innerHTML = '';
+  scoreboard.innerHTML = '';
+
+  var data = null;
+  var items = [];
+
+  function renderList() {
+    if (!items.length) {
+      var notes = (data && data.notes) ? data.notes.join('；') : '';
+      list.innerHTML = '<div class="card">暂无可展示新闻。' + (notes ? ('<br/>' + notes) : '（可能是 RSS 源暂时不可访问）') + '</div>';
     <div id="list"></div>
   </div>
 <script>
@@ -139,6 +180,51 @@ async function loadArticles() {
         + '<div><a href="' + (x.url || '#') + '" target="_blank">' + (x.title || '(无标题)') + '</a></div>'
         + '</div>';
     }).join('');
+  }
+
+  function loadArticlesFallback() {
+    fetch(url)
+      .then(function (res) { return res.json(); })
+      .then(function (body) {
+        data = body;
+        items = body.items || [];
+        status.textContent = '普通列表，共 ' + items.length + ' 条';
+        renderList();
+      })
+      .catch(function () {
+        status.textContent = '加载失败';
+        list.innerHTML = '<div class="card">请求失败，请检查服务日志。</div>';
+      });
+  }
+
+  if (!q) {
+    fetch(digestURL)
+      .then(function (res) {
+        if (!res.ok) {
+          throw new Error('digest not ready');
+        }
+        return res.json();
+      })
+      .then(function (body) {
+        data = body;
+        items = body.items || [];
+        status.textContent = '策略摘要，共 ' + items.length + ' 条';
+        renderScoreboard(data, scoreboard);
+        if (!items.length) {
+          loadArticlesFallback();
+          return;
+        }
+        renderList();
+      })
+      .catch(function () {
+        loadArticlesFallback();
+      });
+    return;
+  }
+
+  loadArticlesFallback();
+}
+
   } catch (e) {
     status.textContent = '加载失败';
     list.innerHTML = '<div class="card">请求失败，请检查服务日志。</div>';
