@@ -30,6 +30,8 @@ powershell -ExecutionPolicy Bypass -File .\scripts\deploy_simple.ps1
 
 若当日抓取失败，会自动保留上一次成功摘要，避免页面空白。
 
+另外系统不会再使用示例假新闻填充页面：看不到真实新闻时会明确显示“暂无可展示新闻”。
+
 如果第一次部署就为空，请先确认网络是否能访问 `data/sources.json` 里的 RSS。
 
 如果你已经配好 Python 环境，也可以直接：

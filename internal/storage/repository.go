@@ -42,8 +42,7 @@ type MemoryArticleRepository struct {
 }
 
 func NewMemoryArticleRepository() *MemoryArticleRepository {
-	now := time.Now().UTC()
-	return &MemoryArticleRepository{articles: []news.Article{{ID: 1, Title: "news-go initialized", URL: "https://example.com/news-go-init", Source: "system", PublishedAt: now}, {ID: 2, Title: "first endpoint online", URL: "https://example.com/healthz", Source: "system", PublishedAt: now.Add(-1 * time.Hour)}}}
+	return &MemoryArticleRepository{articles: []news.Article{}}
 }
 
 func (r *MemoryArticleRepository) ListArticles(_ context.Context, opts ListOptions) ([]news.Article, error) {
