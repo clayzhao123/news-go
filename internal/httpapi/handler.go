@@ -52,6 +52,9 @@ const homeHTML = `<!doctype html>
     .card { background: white; border: 1px solid #e5e7eb; border-radius: 10px; padding: 12px 14px; margin-bottom: 10px; }
     .meta { color: #6b7280; font-size: 12px; margin-bottom: 6px; }
     a { color: #2563eb; text-decoration: none; }
+    table { width: 100%; border-collapse: collapse; background: #fff; border: 1px solid #e5e7eb; border-radius: 10px; overflow: hidden; margin-bottom: 14px; }
+    th, td { border-bottom: 1px solid #eee; padding: 8px; text-align: left; font-size: 13px; }
+    th { background: #f9fafb; }
   </style>
 </head>
 <body>
@@ -63,6 +66,34 @@ const homeHTML = `<!doctype html>
       <button onclick="loadArticles()">刷新</button>
     </div>
     <div id="status" class="hint">加载中...</div>
+    <div id="scoreboard"></div>
+    <div id="list"></div>
+  </div>
+<script>
+function renderScoreboard(data, scoreboard) {
+  if (!data || !data.scores) {
+    return;
+  }
+  const metrics = data.metrics || {};
+  const slots = data.slots || {};
+  const rows = Object.keys(data.scores)
+    .sort((a, b) => (data.scores[b] || 0) - (data.scores[a] || 0))
+    .map((sid) => {
+      const m = metrics[sid] || {};
+      return '<tr>'
+        + '<td>' + sid + '</td>'
+        + '<td>' + (data.scores[sid] ?? 0) + '</td>'
+        + '<td>' + (slots[sid] ?? 0) + '</td>'
+        + '<td>' + (m.weekly_volume ?? 0) + '</td>'
+        + '<td>' + (m.research_ratio ?? 0) + '</td>'
+        + '<td>' + (m.topic_coverage ?? 0) + '</td>'
+        + '</tr>';
+    }).join('');
+  scoreboard.innerHTML = '<table>'
+    + '<thead><tr><th>来源</th><th>评分</th><th>今日配额</th><th>周产量</th><th>研究占比</th><th>覆盖度</th></tr></thead>'
+    + '<tbody>' + rows + '</tbody></table>';
+}
+
     <div id="list"></div>
   </div>
 <script>
@@ -72,6 +103,10 @@ async function loadArticles() {
   const url = '/v1/articles?limit=20&offset=0' + (q ? ('&q=' + encodeURIComponent(q)) : '');
   const status = document.getElementById('status');
   const list = document.getElementById('list');
+  const scoreboard = document.getElementById('scoreboard');
+  status.textContent = '加载中...';
+  list.innerHTML = '';
+  scoreboard.innerHTML = '';
   status.textContent = '加载中...';
   list.innerHTML = '';
   try {
@@ -83,6 +118,7 @@ async function loadArticles() {
         data = await digestRes.json();
         items = data.items || [];
         status.textContent = '策略摘要，共 ' + items.length + ' 条';
+        renderScoreboard(data, scoreboard);
       }
     }
     if (!items.length) {

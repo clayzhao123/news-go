@@ -28,6 +28,8 @@ powershell -ExecutionPolicy Bypass -File .\scripts\deploy_simple.ps1
 2. 生成今日摘要 `data/daily_digest.json`；
 3. 启动 Go 服务（`http://localhost:8080/`）。
 
+8080 首页可直接看到来源评分表（评分、今日配额、周产量、研究占比、覆盖度）。
+
 若当日抓取失败，会自动保留上一次成功摘要，避免页面空白。
 
 另外系统不会再使用示例假新闻填充页面：看不到真实新闻时会明确显示“暂无可展示新闻”。
