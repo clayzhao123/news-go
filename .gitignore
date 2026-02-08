@@ -26,3 +26,7 @@ go.work.sum
 __pycache__/
 *.pyc
 .venv/
+
+# Generated strategy artifacts
+data/weights.json
+data/daily_digest.json
