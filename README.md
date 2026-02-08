@@ -9,6 +9,33 @@
 
 ---
 
+## 最简单部署（你只需要这两条）
+
+### macOS / Linux
+
+```bash
+bash scripts/deploy_simple.sh
+```
+
+### Windows PowerShell
+
+```powershell
+powershell -ExecutionPolicy Bypass -File .\scripts\deploy_simple.ps1
+```
+
+执行后会自动：
+1. 安装 Python 依赖；
+2. 生成今日摘要 `data/daily_digest.json`；
+3. 启动 Go 服务（`http://localhost:8080/`）。
+
+如果你已经配好 Python 环境，也可以直接：
+
+```bash
+make run-all
+```
+
+---
+
 ## 你的初始诉求是否满足（当前版本）
 
 ✅ 已满足（在 `src/news_pipeline.py` + `app.py`）：
@@ -63,14 +90,6 @@ flowchart TD
   G --> H[Streamlit每日摘要展示]
 ```
 
-参数说明：
-
-- `limit`：每页数量
-- `offset`：从第几条开始
-- `q`：关键词
-- `source`：来源名
-- `from/to`：时间范围（必须是 RFC3339，如 `2026-01-01T00:00:00Z`）
-
 ---
 
 ## 每日10篇如何分配
@@ -84,14 +103,12 @@ flowchart TD
 
 ---
 
-## 快速运行（你关心的）
+## 进阶运行（手动分步）
 
 ### A) 运行策略版 UI（推荐看结果）
 
 ```bash
-make test   # 或 go test ./...
-make vet    # 或 go vet ./...
-make fmt    # 或 gofmt -w ./cmd ./internal
+python -m src.digest_job
 ```
 
 打开：`http://localhost:8501`
