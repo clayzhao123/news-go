@@ -94,6 +94,9 @@ function renderScoreboard(data, scoreboard) {
     + '<tbody>' + rows + '</tbody></table>';
 }
 
+    <div id="list"></div>
+  </div>
+<script>
 async function loadArticles() {
   const q = document.getElementById('q').value.trim();
   const digestURL = '/v1/digest';
@@ -104,6 +107,8 @@ async function loadArticles() {
   status.textContent = '加载中...';
   list.innerHTML = '';
   scoreboard.innerHTML = '';
+  status.textContent = '加载中...';
+  list.innerHTML = '';
   try {
     let data = null;
     let items = [];
@@ -125,6 +130,7 @@ async function loadArticles() {
     if (!items.length) {
       const notes = (data && data.notes) ? data.notes.join('；') : '';
       list.innerHTML = '<div class="card">暂无可展示新闻。' + (notes ? ('<br/>' + notes) : '（可能是 RSS 源暂时不可访问）') + '</div>';
+      list.innerHTML = '<div class="card">暂无数据（可能是 RSS 源暂时不可访问）</div>';
       return;
     }
     list.innerHTML = items.map(function (x) {
