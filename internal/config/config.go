@@ -7,6 +7,7 @@ type Config struct {
 	HTTPAddr           string
 	DBPath             string
 	RSSFeedURL         string
+	RSSUserAgent       string
 	RSSSyncIntervalSec int
 	RSSMaxRetries      int
 }
@@ -17,6 +18,7 @@ func Load() Config {
 		HTTPAddr:           getEnv("HTTP_ADDR", ":8080"),
 		DBPath:             getEnv("DB_PATH", "./data/news.db"),
 		RSSFeedURL:         getEnv("RSS_FEED_URL", "https://hnrss.org/frontpage"),
+		RSSUserAgent:       getEnv("RSS_USER_AGENT", "news-go/1.0"),
 		RSSSyncIntervalSec: getEnvInt("RSS_SYNC_INTERVAL_SEC", 300),
 		RSSMaxRetries:      getEnvInt("RSS_MAX_RETRIES", 2),
 	}

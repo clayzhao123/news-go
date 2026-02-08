@@ -40,6 +40,10 @@ func TestMemoryUpsertDeduplicate(t *testing.T) {
 func TestMemoryFilterByKeyword(t *testing.T) {
 	repo := NewMemoryArticleRepository()
 	ctx := context.Background()
+	now := time.Now().UTC()
+	if err := repo.UpsertArticles(ctx, []news.Article{{Title: "initialized headline", URL: "https://example.com/init", Content: "ok", PublishedAt: now}}); err != nil {
+		t.Fatalf("upsert: %v", err)
+	}
 	items, err := repo.ListArticles(ctx, ListOptions{Limit: 100, Offset: 0, Keyword: "initialized"})
 	if err != nil {
 		t.Fatalf("list: %v", err)
