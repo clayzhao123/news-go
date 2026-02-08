@@ -18,6 +18,7 @@ import (
 )
 
 var ErrNotFound = errors.New("not found")
+var ErrSQLiteBinaryNotFound = errors.New("sqlite3 binary not found")
 
 type ListOptions struct {
 	Limit         int
@@ -123,7 +124,7 @@ type SQLiteArticleRepository struct{ dbPath string }
 
 func NewSQLiteArticleRepository(dbPath, schemaPath string) (*SQLiteArticleRepository, error) {
 	if _, err := exec.LookPath("sqlite3"); err != nil {
-		return nil, fmt.Errorf("sqlite3 binary not found")
+		return nil, ErrSQLiteBinaryNotFound
 	}
 	if err := os.MkdirAll(filepath.Dir(dbPath), 0o755); err != nil {
 		return nil, err
