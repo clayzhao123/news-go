@@ -6,6 +6,8 @@ import (
 	"errors"
 	"net/http"
 	"net/http/httptest"
+	"os"
+	"strings"
 	"testing"
 	"time"
 
@@ -47,6 +49,58 @@ func (s stubRepo) GetArticleByID(_ context.Context, id int64) (news.Article, err
 
 func (s stubRepo) UpsertArticles(_ context.Context, _ []news.Article) error { return nil }
 func (s stubRepo) Ready(_ context.Context) error                            { return s.readyErr }
+
+func TestHomePage(t *testing.T) {
+	h := NewHandler(stubRepo{})
+	mux := http.NewServeMux()
+	h.Register(mux)
+
+	rr := httptest.NewRecorder()
+	mux.ServeHTTP(rr, httptest.NewRequest(http.MethodGet, "/", nil))
+	if rr.Code != http.StatusOK {
+		t.Fatalf("expected 200, got %d", rr.Code)
+	}
+	if ct := rr.Header().Get("Content-Type"); !strings.HasPrefix(ct, "text/html") {
+		t.Fatalf("expected text/html content-type, got %q", ct)
+	}
+}
+
+func TestDailyDigestNotFound(t *testing.T) {
+	_ = os.Remove("data/daily_digest.json")
+	h := NewHandler(stubRepo{})
+	mux := http.NewServeMux()
+	h.Register(mux)
+
+	rr := httptest.NewRecorder()
+	mux.ServeHTTP(rr, httptest.NewRequest(http.MethodGet, "/v1/digest", nil))
+	if rr.Code != http.StatusNotFound {
+		t.Fatalf("expected 404, got %d", rr.Code)
+	}
+}
+
+func TestDailyDigestOK(t *testing.T) {
+	if err := os.MkdirAll("data", 0o755); err != nil {
+		t.Fatalf("mkdir data: %v", err)
+	}
+	content := []byte(`{"items":[{"title":"x"}]}`)
+	if err := os.WriteFile("data/daily_digest.json", content, 0o644); err != nil {
+		t.Fatalf("write digest: %v", err)
+	}
+	t.Cleanup(func() { _ = os.Remove("data/daily_digest.json") })
+
+	h := NewHandler(stubRepo{})
+	mux := http.NewServeMux()
+	h.Register(mux)
+
+	rr := httptest.NewRecorder()
+	mux.ServeHTTP(rr, httptest.NewRequest(http.MethodGet, "/v1/digest", nil))
+	if rr.Code != http.StatusOK {
+		t.Fatalf("expected 200, got %d", rr.Code)
+	}
+	if rr.Body.String() == "" {
+		t.Fatalf("expected digest body")
+	}
+}
 
 func TestHealthz(t *testing.T) {
 	h := NewHandler(stubRepo{})
