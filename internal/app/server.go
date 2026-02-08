@@ -2,6 +2,7 @@ package app
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"log"
 	"net/http"
@@ -16,7 +17,6 @@ import (
 func NewServer(cfg config.Config) *http.Server {
 	repo := buildRepository(cfg)
 	syncer := newRSSSyncer(cfg, repo)
-	syncer.syncWithRetry(context.Background())
 	syncer.start(context.Background())
 
 	h := httpapi.NewHandler(repo)
@@ -29,6 +29,10 @@ func NewServer(cfg config.Config) *http.Server {
 func buildRepository(cfg config.Config) storage.ArticleRepository {
 	repo, err := storage.NewSQLiteArticleRepository(cfg.DBPath, "db/schema.sql")
 	if err != nil {
+		if errors.Is(err, storage.ErrSQLiteBinaryNotFound) {
+			log.Printf("sqlite3 not installed, using in-memory repository")
+			return storage.NewMemoryArticleRepository()
+		}
 		log.Printf("sqlite init failed, fallback to memory repo: %v", err)
 		return storage.NewMemoryArticleRepository()
 	}
@@ -46,6 +50,7 @@ func newRSSSyncer(cfg config.Config, repo storage.ArticleRepository) *rssSyncer 
 }
 
 func (s *rssSyncer) start(ctx context.Context) {
+	go s.syncWithRetry(ctx)
 	if s.cfg.RSSSyncIntervalSec <= 0 {
 		return
 	}
@@ -83,7 +88,7 @@ func (s *rssSyncer) syncWithRetry(ctx context.Context) {
 func (s *rssSyncer) syncOnce(ctx context.Context) error {
 	callCtx, cancel := context.WithTimeout(ctx, 15*time.Second)
 	defer cancel()
-	items, err := s.fetcher.Fetch(callCtx, s.cfg.RSSFeedURL)
+	items, err := s.fetcher.Fetch(callCtx, s.cfg.RSSFeedURL, s.cfg.RSSUserAgent)
 	if err != nil {
 		return err
 	}

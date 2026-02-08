@@ -18,6 +18,7 @@ import (
 )
 
 var ErrNotFound = errors.New("not found")
+var ErrSQLiteBinaryNotFound = errors.New("sqlite3 binary not found")
 
 type ListOptions struct {
 	Limit         int
@@ -41,8 +42,7 @@ type MemoryArticleRepository struct {
 }
 
 func NewMemoryArticleRepository() *MemoryArticleRepository {
-	now := time.Now().UTC()
-	return &MemoryArticleRepository{articles: []news.Article{{ID: 1, Title: "news-go initialized", URL: "https://example.com/news-go-init", Source: "system", PublishedAt: now}, {ID: 2, Title: "first endpoint online", URL: "https://example.com/healthz", Source: "system", PublishedAt: now.Add(-1 * time.Hour)}}}
+	return &MemoryArticleRepository{articles: []news.Article{}}
 }
 
 func (r *MemoryArticleRepository) ListArticles(_ context.Context, opts ListOptions) ([]news.Article, error) {
@@ -123,7 +123,7 @@ type SQLiteArticleRepository struct{ dbPath string }
 
 func NewSQLiteArticleRepository(dbPath, schemaPath string) (*SQLiteArticleRepository, error) {
 	if _, err := exec.LookPath("sqlite3"); err != nil {
-		return nil, fmt.Errorf("sqlite3 binary not found")
+		return nil, ErrSQLiteBinaryNotFound
 	}
 	if err := os.MkdirAll(filepath.Dir(dbPath), 0o755); err != nil {
 		return nil, err

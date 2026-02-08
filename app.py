@@ -6,14 +6,16 @@ from src.news_pipeline import build_daily_digest
 
 st.set_page_config(page_title="News Digest", layout="wide")
 
-st.title("每日新闻摘要")
+st.title("每日新闻摘要（权重驱动）")
 
 if st.button("刷新今日摘要") or "digest" not in st.session_state:
     with st.spinner("抓取新闻并计算权重中..."):
-        digest, scores, slots = build_daily_digest()
+        digest, scores, slots, metrics, meta = build_daily_digest()
         st.session_state["digest"] = digest
         st.session_state["scores"] = scores
         st.session_state["slots"] = slots
+        st.session_state["metrics"] = metrics
+        st.session_state["meta"] = meta
 
 st.subheader("来源权重（每周更新）")
 if "scores" in st.session_state:
@@ -23,6 +25,9 @@ if "scores" in st.session_state:
                 "source_id": source_id,
                 "score": score,
                 "slots_today": st.session_state["slots"].get(source_id, 0),
+                "weekly_volume": st.session_state["metrics"].get(source_id, {}).get("weekly_volume", 0),
+                "research_ratio": st.session_state["metrics"].get(source_id, {}).get("research_ratio", 0),
+                "topic_coverage": st.session_state["metrics"].get(source_id, {}).get("topic_coverage", 0),
             }
             for source_id, score in sorted(
                 st.session_state["scores"].items(), key=lambda item: item[1], reverse=True
@@ -32,6 +37,14 @@ if "scores" in st.session_state:
     )
 
 st.subheader("今日新闻（最多10篇）")
+if "meta" in st.session_state:
+    st.caption(
+        f"研究类目标：{st.session_state['meta'].research_target}，"
+        f"已选：{st.session_state['meta'].research_selected}"
+    )
+    for note in st.session_state["meta"].notes:
+        st.warning(note)
+
 if "digest" in st.session_state:
     for article in st.session_state["digest"]:
         with st.container(border=True):

@@ -30,10 +30,13 @@ type rssDocument struct {
 	} `xml:"channel"`
 }
 
-func (f *RSSFetcher) Fetch(ctx context.Context, feedURL string) ([]news.Article, error) {
+func (f *RSSFetcher) Fetch(ctx context.Context, feedURL, userAgent string) ([]news.Article, error) {
 	req, err := http.NewRequestWithContext(ctx, http.MethodGet, feedURL, nil)
 	if err != nil {
 		return nil, err
+	}
+	if userAgent != "" {
+		req.Header.Set("User-Agent", userAgent)
 	}
 	resp, err := f.client.Do(req)
 	if err != nil {
