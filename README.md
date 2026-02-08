@@ -1,50 +1,138 @@
 # news-go
 
-这是一个**混合仓库**，目前包含两部分能力：
+一个给新手也能跑起来的新闻聚合项目（Go 主线 + Python 演示）。
 
-1. **Go 新闻聚合 API（主线）**：RSS 抓取、入库、去重、HTTP 查询接口。
-2. **Python Streamlit 摘要 Demo（实验）**：按来源权重生成中文每日摘要页面。
-
-> 如果你只想快速上手并对接接口，优先使用 **Go API**。
+- **主线推荐**：Go API（更完整、可用于接口联调）
+- **可选演示**：Python Streamlit 页面（摘要 Demo）
 
 ---
 
-## 1) Go 新闻聚合 API（推荐）
+## 先说结论（你最关心的）
 
-### 功能
+- 这个仓库按 README 是可以跑起来的。  
+- 但默认 RSS 源（`https://hnrss.org/frontpage`）在某些网络环境会返回 `403 Forbidden`，导致：
+  - 首次启动会多等几秒（重试）；
+  - 服务能启动，但文章列表可能为空。  
+- 如果你只想先确认“服务活着”，可以直接访问 `/healthz`，不依赖 RSS 成功。
+- 服务已改为**先启动 HTTP，再后台同步 RSS**，避免因 RSS 不可达阻塞启动。
 
-- HTTP 服务（`cmd/api`）
-- 健康检查：`GET /healthz`
-- 就绪检查：`GET /readyz`
-- 文章列表：`GET /v1/articles?limit=&offset=&q=&source=&from=&to=`
-  - `from/to` 必须是 RFC3339 时间格式
-  - 且 `from <= to`，否则返回 `400`
-- 文章详情：`GET /v1/articles/{id}`
-- RSS 启动抓取 + 定时同步（可配置重试）
-- 存储优先 SQLite，不可用时回退内存仓储
-- URL 去重（`url_hash` 唯一约束 + upsert）
+---
 
-### 环境变量
+## A. 电脑小白版：3 分钟跑通 Go API（推荐）
 
-可通过 `.env` 文件或系统环境变量传入：
+### 1) 你需要先安装什么
 
-- `APP_ENV`（默认 `dev`）
-- `HTTP_ADDR`（默认 `:8080`）
-- `DB_PATH`（默认 `./data/news.db`）
-- `RSS_FEED_URL`（默认 `https://hnrss.org/frontpage`）
-- `RSS_SYNC_INTERVAL_SEC`（默认 `300`）
-- `RSS_MAX_RETRIES`（默认 `2`）
+- Git（用于拉代码）
+- Go 1.22+（用于运行后端）
 
-### 快速启动
+不知道是否安装成功？在终端执行：
+
+```bash
+git --version
+go version
+```
+
+只要能输出版本号就行。
+
+### 2) 进入项目目录
+
+```bash
+cd news-go
+```
+
+### 3) 准备配置文件（直接复制模板）
 
 ```bash
 cp .env.example .env
+```
+
+### 4) 启动服务
+
+```bash
 make run
 ```
 
-启动后默认监听 `http://localhost:8080`。
+你会看到类似输出：
 
-### 常用命令
+```text
+news-go listening on :8080
+```
+
+> 提示：如果看到 RSS `403` 日志，不等于启动失败，只是拉新闻失败。
+
+### 5) 打开另一个终端，验证是否跑通
+
+```bash
+curl http://localhost:8080/healthz
+```
+
+看到：
+
+```json
+{"status":"ok"}
+```
+
+就说明服务已经跑起来了 ✅
+
+### 6) 再试一个实际接口
+
+```bash
+curl "http://localhost:8080/v1/articles?limit=10&offset=0"
+```
+
+如果返回空数组（`"items":[]`）通常是 RSS 源未抓到数据，不影响 API 框架本身运行。
+
+---
+
+## B. 如果文章一直为空：一键排查
+
+你可以先把重试次数调低，减少等待时间：
+
+打开 `.env`，把这行改成：
+
+```env
+RSS_MAX_RETRIES=0
+```
+
+然后重启 `make run`。
+
+如果你希望更容易抓到数据，可以把 `.env` 中的 `RSS_FEED_URL` 改成你可访问的 RSS 地址。
+
+另外可尝试设置请求头（部分站点会校验）：
+
+```env
+RSS_USER_AGENT=news-go/1.0
+```
+
+---
+
+## C. 常用接口（复制就能用）
+
+```bash
+# 健康检查
+curl http://localhost:8080/healthz
+
+# 就绪检查
+curl http://localhost:8080/readyz
+
+# 文章列表
+curl "http://localhost:8080/v1/articles?limit=10&offset=0"
+
+# 按关键词 + 来源过滤
+curl "http://localhost:8080/v1/articles?q=ai&source=Hacker%20News"
+```
+
+参数说明：
+
+- `limit`：每页数量
+- `offset`：从第几条开始
+- `q`：关键词
+- `source`：来源名
+- `from/to`：时间范围（必须是 RFC3339，如 `2026-01-01T00:00:00Z`）
+
+---
+
+## D. 开发常用命令（不会写代码也可忽略）
 
 ```bash
 make test
@@ -52,45 +140,24 @@ make vet
 make fmt
 ```
 
-### 接口示例
-
-```bash
-# 健康检查
-curl http://localhost:8080/healthz
-
-# 查询最近文章
-curl "http://localhost:8080/v1/articles?limit=10&offset=0"
-
-# 按关键词和来源过滤
-curl "http://localhost:8080/v1/articles?q=ai&source=Hacker%20News"
-```
-
 ---
 
-## 2) Python Streamlit 摘要 Demo（可选）
+## E. 可选：运行 Python Streamlit 摘要 Demo
 
-该部分位于：
-
-- `app.py`
-- `src/news_pipeline.py`
-- `data/sources.json`
-
-用于展示“每日新闻评分与摘要”界面，适合演示；与 Go API 目前不是同一运行时。
-
-### 运行方式
+这部分是演示页面，和 Go API 不是同一运行时。
 
 ```bash
 python -m venv .venv
-source .venv/bin/activate  # Windows: .venv\Scripts\activate
+source .venv/bin/activate  # Windows 用: .venv\Scripts\activate
 pip install -r requirements.txt
 streamlit run app.py
 ```
 
-浏览器打开 `http://localhost:8501`。
+浏览器打开：`http://localhost:8501`
 
 ---
 
-## 项目结构（核心）
+## F. 项目结构（你可以先不懂，知道位置即可）
 
 ```text
 news-go/
@@ -100,14 +167,19 @@ news-go/
 ├─ app.py                    # Streamlit Demo 入口
 ├─ src/news_pipeline.py      # Python 摘要流程
 ├─ data/sources.json         # 新闻源配置
-├─ .env.example
+├─ .env.example              # 环境变量模板
 ├─ Makefile
 └─ README.md
 ```
 
 ---
 
-## 说明
+## G. 给你一个最短“成功路径”
 
-- 当前仓库处于“Go API 主线 + Python Demo 并存”状态。
-- 若后续要统一架构，建议让 Streamlit 直接消费 Go API，避免双套抓取逻辑。
+如果你只想确认项目没坏：
+
+1. `cp .env.example .env`
+2. `make run`
+3. 新终端执行 `curl http://localhost:8080/healthz`
+4. 看到 `{"status":"ok"}` 就算跑通
+
