@@ -1,83 +1,146 @@
 # news-go
 
-这是一个**混合仓库**，目前包含两部分能力：
+`news-go` 是一个新闻聚合项目：
 
-1. **Go 新闻聚合 API（主线）**：RSS 抓取、入库、去重、HTTP 查询接口。
-2. **Python Streamlit 摘要 Demo（实验）**：按来源权重生成中文每日摘要页面。
-
-> 如果你只想快速上手并对接接口，优先使用 **Go API**。
+- **Go API（主线）**：抓取 RSS、存储、查询接口。
+- **Python Streamlit（可选）**：摘要演示页面。
 
 ---
 
-## 1) Go 新闻聚合 API（推荐）
+## 1. 先看结论（避免你反复踩坑）
 
-### 功能
+1. 你在 Windows 报 `make` 找不到，是因为系统通常默认**没安装 make**，不是项目坏了。
+2. Windows 上直接跑：`go run ./cmd/api`（不需要 make）。
+3. 如果日志出现 `sqlite3 not installed, using in-memory repository`，服务仍然能跑，只是数据不落盘。
+4. `/healthz` 返回 `{"status":"ok"}` 就表示服务已跑通。
 
-- HTTP 服务（`cmd/api`）
-- 健康检查：`GET /healthz`
-- 就绪检查：`GET /readyz`
-- 文章列表：`GET /v1/articles?limit=&offset=&q=&source=&from=&to=`
-  - `from/to` 必须是 RFC3339 时间格式
-  - 且 `from <= to`，否则返回 `400`
-- 文章详情：`GET /v1/articles/{id}`
-- RSS 启动抓取 + 定时同步（可配置重试）
-- 存储优先 SQLite，不可用时回退内存仓储
-- URL 去重（`url_hash` 唯一约束 + upsert）
+---
 
-### 环境变量
+## 2. 快速启动（Windows PowerShell，推荐）
 
-可通过 `.env` 文件或系统环境变量传入：
+### 步骤 1：进入目录
 
-- `APP_ENV`（默认 `dev`）
-- `HTTP_ADDR`（默认 `:8080`）
-- `DB_PATH`（默认 `./data/news.db`）
-- `RSS_FEED_URL`（默认 `https://hnrss.org/frontpage`）
-- `RSS_SYNC_INTERVAL_SEC`（默认 `300`）
-- `RSS_MAX_RETRIES`（默认 `2`）
+```powershell
+cd news-go
+```
 
-### 快速启动
+### 步骤 2：复制配置
+
+```powershell
+Copy-Item .env.example .env
+```
+
+### 步骤 3：启动服务（不使用 make）
+
+```powershell
+go run ./cmd/api
+```
+
+看到类似输出表示成功：
+
+```text
+news-go listening on :8080
+```
+
+### 步骤 4：验证
+
+新开一个 PowerShell：
+
+```powershell
+curl http://localhost:8080/healthz
+```
+
+看到：
+
+```json
+{"status":"ok"}
+```
+
+---
+
+## 3. 常见问题
+
+### Q1：`make run` 报错（make 未识别）
+
+原因：你机器没装 make。  
+解决：直接执行以下等价命令：
+
+```powershell
+go run ./cmd/api
+```
+
+### Q2：出现 `sqlite3 not installed, using in-memory repository`
+
+原因：没装 `sqlite3` 命令行工具。  
+影响：服务可用，但重启后数据会丢失（内存模式）。
+
+可选安装（Windows）：
+
+```powershell
+winget install SQLite.SQLite
+```
+
+安装后重开终端，再执行 `go run ./cmd/api`。
+
+### Q3：服务起来了，但文章为空
+
+常见原因：默认 RSS 源在部分网络环境会 403。
+
+可尝试修改 `.env`：
+
+```env
+RSS_MAX_RETRIES=0
+RSS_FEED_URL=<你能访问的 RSS 地址>
+RSS_USER_AGENT=news-go/1.0
+```
+
+---
+
+## 4. 其他系统启动方式（macOS/Linux）
 
 ```bash
+cd news-go
 cp .env.example .env
 make run
 ```
 
-启动后默认监听 `http://localhost:8080`。
-
-### 常用命令
+如果你没有 make，也可以直接：
 
 ```bash
-make test
-make vet
-make fmt
+go run ./cmd/api
 ```
 
-### 接口示例
+---
+
+## 5. 接口示例
 
 ```bash
 # 健康检查
 curl http://localhost:8080/healthz
 
-# 查询最近文章
+# 就绪检查
+curl http://localhost:8080/readyz
+
+# 文章列表
 curl "http://localhost:8080/v1/articles?limit=10&offset=0"
 
-# 按关键词和来源过滤
+# 关键词 + 来源过滤
 curl "http://localhost:8080/v1/articles?q=ai&source=Hacker%20News"
 ```
 
 ---
 
-## 2) Python Streamlit 摘要 Demo（可选）
+## 6. 开发命令
 
-该部分位于：
+```bash
+make test   # 或 go test ./...
+make vet    # 或 go vet ./...
+make fmt    # 或 gofmt -w ./cmd ./internal
+```
 
-- `app.py`
-- `src/news_pipeline.py`
-- `data/sources.json`
+---
 
-用于展示“每日新闻评分与摘要”界面，适合演示；与 Go API 目前不是同一运行时。
-
-### 运行方式
+## 7. 可选：运行 Python Streamlit Demo
 
 ```bash
 python -m venv .venv
@@ -86,28 +149,4 @@ pip install -r requirements.txt
 streamlit run app.py
 ```
 
-浏览器打开 `http://localhost:8501`。
-
----
-
-## 项目结构（核心）
-
-```text
-news-go/
-├─ cmd/api/                  # Go 服务入口
-├─ internal/                 # Go 业务逻辑（抓取/存储/API）
-├─ db/schema.sql             # SQLite 初始化脚本
-├─ app.py                    # Streamlit Demo 入口
-├─ src/news_pipeline.py      # Python 摘要流程
-├─ data/sources.json         # 新闻源配置
-├─ .env.example
-├─ Makefile
-└─ README.md
-```
-
----
-
-## 说明
-
-- 当前仓库处于“Go API 主线 + Python Demo 并存”状态。
-- 若后续要统一架构，建议让 Streamlit 直接消费 Go API，避免双套抓取逻辑。
+浏览器打开：`http://localhost:8501`。
