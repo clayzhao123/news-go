@@ -1,83 +1,84 @@
 # news-go
 
-这是一个**混合仓库**，目前包含两部分能力：
+本仓库目前有两条线：
 
-1. **Go 新闻聚合 API（主线）**：RSS 抓取、入库、去重、HTTP 查询接口。
-2. **Python Streamlit 摘要 Demo（实验）**：按来源权重生成中文每日摘要页面。
+- **Go API（工程主线）**：抓取 RSS、入库、提供接口与简易浏览 UI（`http://localhost:8080/`）。
+- **Python Streamlit（策略线）**：实现“每周来源打分 + 每日10篇加权摘要”策略（`streamlit run app.py`）。
 
-> 如果你只想快速上手并对接接口，优先使用 **Go API**。
-
----
-
-## 1) Go 新闻聚合 API（推荐）
-
-### 功能
-
-- HTTP 服务（`cmd/api`）
-- 健康检查：`GET /healthz`
-- 就绪检查：`GET /readyz`
-- 文章列表：`GET /v1/articles?limit=&offset=&q=&source=&from=&to=`
-  - `from/to` 必须是 RFC3339 时间格式
-  - 且 `from <= to`，否则返回 `400`
-- 文章详情：`GET /v1/articles/{id}`
-- RSS 启动抓取 + 定时同步（可配置重试）
-- 存储优先 SQLite，不可用时回退内存仓储
-- URL 去重（`url_hash` 唯一约束 + upsert）
-
-### 环境变量
-
-可通过 `.env` 文件或系统环境变量传入：
-
-- `APP_ENV`（默认 `dev`）
-- `HTTP_ADDR`（默认 `:8080`）
-- `DB_PATH`（默认 `./data/news.db`）
-- `RSS_FEED_URL`（默认 `https://hnrss.org/frontpage`）
-- `RSS_SYNC_INTERVAL_SEC`（默认 `300`）
-- `RSS_MAX_RETRIES`（默认 `2`）
-
-### 快速启动
-
-```bash
-cp .env.example .env
-make run
-```
-
-启动后默认监听 `http://localhost:8080`。
-
-### 常用命令
-
-```bash
-make test
-make vet
-make fmt
-```
-
-### 接口示例
-
-```bash
-# 健康检查
-curl http://localhost:8080/healthz
-
-# 查询最近文章
-curl "http://localhost:8080/v1/articles?limit=10&offset=0"
-
-# 按关键词和来源过滤
-curl "http://localhost:8080/v1/articles?q=ai&source=Hacker%20News"
-```
+如果你的目标是你提的那套“来源权威性评分 + 每日10篇加权推送”，请直接使用 **Python Streamlit** 这条线。
 
 ---
 
-## 2) Python Streamlit 摘要 Demo（可选）
+## 你的初始诉求是否满足（当前版本）
 
-该部分位于：
+✅ 已满足（在 `src/news_pipeline.py` + `app.py`）：
 
-- `app.py`
-- `src/news_pipeline.py`
-- `data/sources.json`
+1. **每周给来源打分（影响因子风格）**：
+   - 每 7 天更新一次分数并缓存到 `data/weights.json`。
+2. **根据权重分配每日摘要名额**：
+   - 每日总量 10 篇。
+   - 高权重来源可获得 2~3 篇；低权重可能 0 篇。
+3. **按领域过滤**：
+   - 仅收录 `汽车 / AI / 游戏 / 政治`。
+4. **研究类约束**：
+   - 优先保证至少 2 篇“AI/汽车前沿研究”新闻；若当天不足会在 UI 明确提示。
+5. **可信度基本审查**：
+   - 仅从你认可的白名单来源（`data/sources.json`）采集。
 
-用于展示“每日新闻评分与摘要”界面，适合演示；与 Go API 目前不是同一运行时。
+---
 
-### 运行方式
+## 算法原理（为什么这么做）
+
+我们用一个 **Impact-Factor-like** 的可解释打分：
+
+- `base_authority`：你对来源的先验权威评分（人工设定）。
+- `weekly_volume`：近 7 天该来源产出量（log 平滑）。
+- `research_ratio`：近 7 天研究类新闻占比。
+- `topic_coverage`：近 7 天覆盖 4 个目标领域的广度。
+
+### 评分公式
+
+\[
+score = base\_authority \times \left(1 + 0.45\cdot\log(1+weekly\_volume) + 0.35\cdot research\_ratio + 0.20\cdot topic\_coverage\right)
+\]
+
+### 为什么用这套公式
+
+- `base_authority` 保证“权威媒体先验”被保留；
+- `log(volume)` 防止“纯刷量”碾压；
+- `research_ratio` 奖励研究型内容；
+- `topic_coverage` 奖励领域覆盖均衡；
+- 全部特征可解释，可在 UI 直接展示，便于人工审计。
+
+### 流程图（图像化展示）
+
+```mermaid
+flowchart TD
+  A[白名单来源 data/sources.json] --> B[抓取RSS并过滤可信链接]
+  B --> C[分类: AI/汽车/游戏/政治]
+  C --> D[每周打分 score]
+  D --> E[按权重分配每日10篇名额]
+  E --> F[优先选AI/汽车研究类>=2篇]
+  F --> G[不足则提示并输出可得内容]
+  G --> H[Streamlit每日摘要展示]
+```
+
+---
+
+## 每日10篇如何分配
+
+- 总名额固定 10。
+- 按 score 比例分配，单源上限 3 篇。
+- 低分源可分到 0 篇。
+- 然后从“当天新闻”中按来源与时间优先级选择。
+
+> 这意味着不是“每个来源都必须有新闻”，而是“高权重多拿、低权重可不拿”。
+
+---
+
+## 快速运行（你关心的）
+
+### A) 运行策略版 UI（推荐看结果）
 
 ```bash
 python -m venv .venv
@@ -86,28 +87,44 @@ pip install -r requirements.txt
 streamlit run app.py
 ```
 
-浏览器打开 `http://localhost:8501`。
+打开：`http://localhost:8501`
 
----
+### B) 生成策略摘要文件（供 Go UI / API 读取）
 
-## 项目结构（核心）
-
-```text
-news-go/
-├─ cmd/api/                  # Go 服务入口
-├─ internal/                 # Go 业务逻辑（抓取/存储/API）
-├─ db/schema.sql             # SQLite 初始化脚本
-├─ app.py                    # Streamlit Demo 入口
-├─ src/news_pipeline.py      # Python 摘要流程
-├─ data/sources.json         # 新闻源配置
-├─ .env.example
-├─ Makefile
-└─ README.md
+```bash
+python -m src.digest_job
 ```
 
+会生成：`data/daily_digest.json`（建议用系统定时任务每天跑一次）。
+
+### C) 运行 Go API（工程服务）
+
+```bash
+cp .env.example .env
+go run ./cmd/api   # Windows 同样可用
+```
+
+打开：`http://localhost:8080/`
+
+- 根页面会优先读取策略摘要接口 `GET /v1/digest`。
+- 若当天未生成摘要文件，会自动回退展示普通新闻列表。
+
 ---
 
-## 说明
+## 关键文件
 
-- 当前仓库处于“Go API 主线 + Python Demo 并存”状态。
-- 若后续要统一架构，建议让 Streamlit 直接消费 Go API，避免双套抓取逻辑。
+- `src/news_pipeline.py`：每周评分、每日10篇分配、研究类约束。
+- `app.py`：可视化展示权重、名额、今日摘要。
+- `data/sources.json`：白名单来源与基础权威分。
+- `data/weights.json`：每周评分缓存。
+- `src/digest_job.py`：生成 `data/daily_digest.json` 的每日任务脚本。
+
+---
+
+## 局限与后续建议
+
+当前“真实性”采用白名单 + 基础规则过滤。若要更严格，建议后续增加：
+
+1. 多源交叉印证（同主题至少2家权威源）；
+2. 事实核查源（如官方通告）比对；
+3. LLM + 检索证据链评分（附证据链接）。
